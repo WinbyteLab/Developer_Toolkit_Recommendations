@@ -1,6 +1,8 @@
 # План моделей и хранения на DGX Spark
 
-> **Статус: план, не отчёт об установке.** SSH-сервис Spark доступен по сети, но удалённая авторизация пока не прошла. Конфигурацию памяти, свободное место и содержимое диска на устройстве не проверяли; наличие `/srv/ai` также не подтверждено, папку мы не создавали.
+> **Статус: план, не отчёт об установке.** Удалённый доступ к Spark сейчас отсутствует; конфигурацию памяти, свободное место и содержимое диска на устройстве не проверяли. Наличие `/srv/ai` не подтверждено, папку мы не создавали.
+
+Подробная пошаговая инструкция по Qwen3.8-27B, локальному API, подключению Hermes и публикации: [model/Qwen3.8-27B/README.md](../model/Qwen3.8-27B/README.md).
 
 ## Какие модели планируем
 
@@ -30,11 +32,13 @@
 │   ├── vllm/                  # проверенные launch-скрипты и конфигурации
 │   └── comfyui/               # приложение и workflow, отдельно от весов
 ├── models/
-│   ├── huggingface/hub/       # управляемое хранилище HF-моделей
+│   ├── huggingface/hub/       # постоянное HF-хранилище моделей; layout управляется HF
 │   ├── comfyui/               # модели ComfyUI; точный layout сверить с recipe
 │   └── optional/              # отложенные embedding/OCR/прочие checkpoints
 ├── cache/
-│   ├── huggingface/           # метаданные/служебный кэш HF
+│   ├── vllm/                  # runtime cache (64-GB recipe)
+│   ├── flashinfer/            # runtime cache (64-GB recipe)
+│   ├── triton/                # runtime cache (64-GB recipe)
 │   ├── torch/
 │   ├── xdg/
 │   └── runtime/
@@ -61,7 +65,9 @@ else
     /srv/ai/models/huggingface/hub \
     /srv/ai/models/comfyui \
     /srv/ai/models/optional \
-    /srv/ai/cache/huggingface \
+    /srv/ai/cache/vllm \
+    /srv/ai/cache/flashinfer \
+    /srv/ai/cache/triton \
     /srv/ai/cache/torch \
     /srv/ai/cache/xdg \
     /srv/ai/cache/runtime \
@@ -74,11 +80,12 @@ fi
 Для процессов Hugging Face задать постоянные пути в окружении самого сервиса до его запуска, затем проверить их фактическое значение:
 
 ```bash
-export HF_HOME=/srv/ai/cache/huggingface
-export HF_HUB_CACHE=/srv/ai/models/huggingface/hub
-export TORCH_HOME=/srv/ai/cache/torch
-export XDG_CACHE_HOME=/srv/ai/cache/xdg
-export TMPDIR=/srv/ai/tmp/downloads
+export AI_ROOT=/srv/ai
+export HF_HOME="$AI_ROOT/models/huggingface"
+export HF_HUB_CACHE="$HF_HOME/hub"
+export TORCH_HOME="$AI_ROOT/cache/torch"
+export XDG_CACHE_HOME="$AI_ROOT/cache/xdg"
+export TMPDIR="$AI_ROOT/tmp/downloads"
 ```
 
 Проверить, что launch-скрипт и контейнер действительно получают эти переменные. Не скачивать одну модель одновременно в HF Hub и отдельный `--local-dir`: это может создать дубликат. Не менять параметры официального рецепта вслепую — сначала проверить, какой путь он использует.
