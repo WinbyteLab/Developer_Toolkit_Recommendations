@@ -1,0 +1,9 @@
+# Local-only work notes and audit downloads
+/WORKLOG.md
+/_audit/
+
+# Editor and temporary files
+.vscode/
+.idea/
+*.tmp
+*.bak

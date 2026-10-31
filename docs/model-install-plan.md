@@ -1,8 +1,8 @@
 # План моделей и хранения на DGX Spark
 
-> **Статус: план, не отчёт об установке.** Удалённый доступ к Spark сейчас отсутствует; конфигурацию памяти, свободное место и содержимое диска на устройстве не проверяли. Наличие `/srv/ai` не подтверждено, папку мы не создавали.
+> **Статус: план, не отчёт об установке.** По переданному владельцем preflight-выводу Spark — NVIDIA GB10, 128 ГБ по `MemTotal`, Ubuntu 24.04.5 LTS ARM64 и около 3,5 ТБ свободно. Docker daemon активен, но обычный пользователь не имеет доступа к socket; через `sudo` проверка версии сервера проходит. Агент не подключался к Spark, `/srv/ai` не проверялся. По решению владельца модели пока не устанавливаются.
 
-Подробная пошаговая инструкция по Qwen3.8-27B, локальному API, подключению Hermes и публикации: [model/Qwen3.8-27B/README.md](../model/Qwen3.8-27B/README.md).
+Подробные сценарии: [Qwen3.8-27B runbook](../model/Qwen3.8-27B/README.md) и [ComfyUI + Z-Image-Turbo runbook](./comfyui-zimage.md).
 
 ## Какие модели планируем
 
@@ -12,15 +12,18 @@
 |---|---|---|---|
 | 1 | [`nvidia/Qwen3.8-27B-NVFP4`](https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4) | Основная coding-модель и локальный API для Windows IDE | Использовать соответствующий официальный [рецепт vLLM для DGX Spark](https://build.nvidia.com/spark/vllm/intermediate). Сначала установить только её и проверить фактическую память, диск, готовность API и тестовый запрос. |
 | 1a | [`z-lab/Qwen3.8-27B-DFlash2`](https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2) | Вспомогательная draft-модель, требуемая некоторыми вариантами рецепта Qwen для speculative decoding | Загружать только если это предусмотрено выбранным NVIDIA-рецептом; учитывать в манифесте и расчёте места. |
-| 2 | [`Tongyi-MAI/Z-Image-Turbo`](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) | Генерация иллюстраций, фонов и концептов через ComfyUI | Устанавливать после проверки coding-модели. Сверить версии и каталог моделей с [NVIDIA quick start для ComfyUI на Spark](https://build.nvidia.com/spark/comfyui/image-gen-quick-start). |
+| 2 | [`Comfy-Org/z_image_turbo`](https://huggingface.co/Comfy-Org/z_image_turbo) — BF16 baseline files | Генерация иллюстраций, фонов и концептов через ComfyUI | Только baseline bundle из трёх файлов, который использует NVIDIA setup script; устанавливать после проверки coding-модели и отдельного разрешения. `Tongyi-MAI/Z-Image-Turbo` — upstream-источник, не repo весов из этого recipe. Сверить файлы и каталог с [NVIDIA quick start](https://build.nvidia.com/spark/comfyui/image-gen-quick-start) и [отдельным runbook](./comfyui-zimage.md). |
 
 ### Позже, если появится конкретная потребность
 
+Ниже — отложенные компоненты, не часть первоначальной установки. Для каждого сначала определить сценарий и точный checkpoint, проверить лицензию, выбрать совместимый runtime и описать end-to-end процедуру; до проверки на целевой среде не включать компонент в baseline и не скачивать.
+
 | Идентификатор | Для чего | Решение |
 |---|---|---|
-| FLUX.2 Klein 4B | Редактирование изображений и работа с референсами | Не включать в первый запуск; сначала подтвердить совместимость workflow с выбранной версией ComfyUI по [руководству ComfyUI](https://docs.comfy.org/tutorials/flux/flux-2-klein). |
-| `Qwen/Qwen3-Embedding-0.6B` + `Qwen/Qwen3-Reranker-0.6B` | Поиск по большой локальной кодовой базе | Отложить до выбора и проверки отдельного retrieval-стека. |
-| `deepseek-ai/DeepSeek-OCR-2` | Извлечение текста и структуры из PDF/скриншотов | Отложить до появления OCR-сценария и проверки runtime. |
+| FLUX.2 Klein 4B | Редактирование изображений и работа с референсами | Опционально позже; не включать в первоначальный baseline. Сверить workflow с выбранной версией ComfyUI по [ComfyUI guide](https://docs.comfy.org/tutorials/flux/flux-2-klein) и выполнить сквозной тест на целевой среде; runtime и DGX Spark workflow пока не проверены. |
+| [black-forest-labs/FLUX.2-klein-9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) | Генерация и редактирование изображений | Не включать в коммерческий/производственный baseline: точный checkpoint распространяется по [FLUX Non-Commercial License](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B/blob/main/LICENSE.md). Рассматривать только для подходящего некоммерческого сценария, после проверки лицензии, выбора runtime/workflow и сквозного теста на целевой системе. |
+| `Qwen/Qwen3-Embedding-0.6B` + `Qwen/Qwen3-Reranker-0.6B` | Поиск по большой локальной кодовой базе | Отложить до выбора retrieval-стека и end-to-end процедуры индексации, поиска и rerank на целевой среде. |
+| `deepseek-ai/DeepSeek-OCR-2` | Извлечение текста и структуры из PDF/скриншотов | Отложить до появления конкретного OCR-сценария, выбора совместимого runtime и сквозной проверки на целевой среде. |
 
 Модели, отмеченные «позже», **не входят в первоначальный план установки**. Веса могут храниться на SSD, но не следует рассчитывать на одновременную загрузку всех моделей в общую память Spark; запускать и проверять их нужно по одной.
 

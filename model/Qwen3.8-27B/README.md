@@ -1,37 +1,42 @@
 # Qwen3.8-27B на DGX Spark: установка, API и Hermes
 
-> **Статус:** это пошаговая инструкция, а не отчёт об установленной системе. Команды на пользовательском Spark не выполнялись: перед началом проверьте память, ОС, Docker и свободное место. Используйте ветку только для фактической конфигурации 64 или 128 ГБ unified memory. Не запускайте обе ветки подряд.
+> **Статус:** это runbook, не отчёт об установке. По данным владельца целевой Spark — GB10/128 ГБ, Ubuntu 24.04.5 ARM64; `nvidia-smi` показывает память как `N/A`, а Docker socket доступен пользователю только через `sudo`. Владелец пока запретил скачивать и запускать модели; команды ниже не выполнялись.
 
-## Что устанавливаем
+## Что устанавливает этот runbook
 
-- Основной checkpoint: `nvidia/Qwen3.8-27B-NVFP4` — NVIDIA-квантованный вариант Qwen3.8-27B, который NVIDIA указывает для DGX Spark с 64 и 128 ГБ.[1][4]
-- Draft checkpoint: `z-lab/Qwen3.8-27B-DFlash2` — вспомогательная модель для speculative decoding, не самостоятельная чат-модель; оба официальных launch-скрипта Qwen используют её.[1][3][5]
-- Runtime: vLLM в официальном варианте контейнера для соответствующей памяти.
-- API: OpenAI-compatible API на `127.0.0.1:8000`. Доступ с ПК — через NVIDIA Sync port forwarding либо через SSH-туннель, не через открытый порт в LAN.[1]
+- Основной checkpoint: `nvidia/Qwen3.8-27B-NVFP4`, mixed NVFP4/FP8, Hub snapshot `482ca0f3832238542f8f5295dde86b5f22711d80`.[13][77]
+- Draft checkpoint: `z-lab/Qwen3.8-27B-DFlash2`, Hub snapshot `50307d4c4cde6860d4eee73e2547cd786fe8e8a4`; это вспомогательная модель для speculative decoding, не отдельный чат-сервер.[66][68][78]
+- Для целевого 128-ГБ профиля применяется NVIDIA vLLM launcher и соответствующий image; 64-ГБ вариант ниже оставлен только как отдельная справочная ветка.[20][66]
+- API по умолчанию слушает только `127.0.0.1:8000`; с Windows подключайтесь через SSH-туннель, не открывая сервис в LAN.[20]
 
-Веса Hugging Face будут храниться в `/srv/ai/models/huggingface/hub`. Не удаляйте этот каталог как «временный cache»: в нём находятся сами веса.
+Сравнение вариантов, размеры и лицензии находятся в [технической матрице](../../docs/model-and-license-matrix.md). SHA выше — snapshot на 2026-10-31; в следующих командах он будет использован явно, а не разрешён через `main`.
 
 ## 1. Подготовить DGX Spark
 
 ### 1.1 Подключиться и проверить устройство
 
-В NVIDIA Sync добавьте Spark через mDNS, IP-адрес или существующий SSH alias, подключитесь и откройте **Terminal**. Вручную введите команды на самом Spark:
+Подключитесь к Spark по уже настроенному SSH или через NVIDIA Sync и откройте терминал. Выполните read-only preflight на самом устройстве; не публикуйте hostname, username или секреты.
 
 ```bash
-whoami
-hostname
 uname -m
 cat /etc/os-release
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+grep -E 'MemTotal|MemAvailable' /proc/meminfo
 free -h
 findmnt -T /srv
 df -h /srv "$HOME"
+id
+stat -c '%A %U:%G %n' /var/run/docker.sock
 docker version
-docker info
-docker ps -a
+sudo docker info --format '{{.ServerVersion}}'
+sudo docker ps -a
 ```
 
-Убедитесь, что `/srv` находится на SSD с достаточным свободным местом. Если `/srv/ai` уже существует, сначала осмотрите его — не меняйте владельца рекурсивно и не удаляйте содержимое. Далее выберите **одну** ветку по реальному объёму unified memory: 64 ГБ или 128 ГБ. NVIDIA публикует для них разные image и launch-настройки.[1]
+Для этого владельца `MemTotal` указывает на 128-ГБ систему, а `nvidia-smi` возвращает `N/A` для объёма памяти. Используйте 128-ГБ ветку; если повторный вывод отличается, остановитесь и перепроверьте профиль перед любым запуском.
+
+Обычный пользователь не имеет доступа к Docker socket; `sudo docker info` работает. Не добавляйте пользователя в группу `docker` автоматически: это уровень привилегий root. Ручной сценарий ниже использует `sudo`; NVIDIA Sync Custom App в текущем профиле нельзя считать доступным без отдельного решения о Docker-доступе.[20]
+
+Убедитесь, что `/srv` находится на SSD с достаточным свободным местом. Если `/srv/ai` уже существует, сначала осмотрите его — не меняйте владельца рекурсивно и не удаляйте содержимое. NVIDIA публикует отдельные image и launcher для 64 и 128 ГБ; используйте только соответствующую ветку.[20][65][66]
 
 ### 1.2 Создать каталог, только если его ещё нет
 
@@ -77,6 +82,8 @@ export AI_ROOT=/srv/ai
 export HF_HOME="$AI_ROOT/models/huggingface"
 export HF_HUB_CACHE="$HF_HOME/hub"
 export TMPDIR="$AI_ROOT/tmp"
+export QWEN_REV=482ca0f3832238542f8f5295dde86b5f22711d80
+export DRAFT_REV=50307d4c4cde6860d4eee73e2547cd786fe8e8a4
 EOF
 chmod 0644 /srv/ai/config/paths.sh
 source /srv/ai/config/paths.sh
@@ -84,9 +91,9 @@ printf 'HF_HOME=%s\nHF_HUB_CACHE=%s\nTMPDIR=%s\n' "$HF_HOME" "$HF_HUB_CACHE" "$T
 df -h "$HF_HOME" "$TMPDIR"
 ```
 
-Не задавайте `HF_HOME` и `HF_HUB_CACHE` на разные несвязанные корни: официальный launcher монтирует `HF_HOME` внутрь контейнера как `/root/.cache/huggingface`. С указанными значениями `hf download` и vLLM используют один и тот же каталог моделей.[2][3]
+Не задавайте `HF_HOME` и `HF_HUB_CACHE` на разные несвязанные корни: официальный launcher монтирует `HF_HOME` внутрь контейнера как `/root/.cache/huggingface`. С указанными значениями `hf download` и vLLM используют один и тот же каталог моделей.[65][66]
 
-Если `hf` не найден, установите официальный standalone CLI Hugging Face и откройте новый терминал:[1][7]
+Если `hf` не найден, установите официальный standalone CLI Hugging Face и откройте новый терминал:[20][53]
 
 ```bash
 curl -LsSf https://hf.co/cli/install.sh | bash -s -- --exclude-skill
@@ -102,51 +109,60 @@ hf --help
 ```bash
 source /srv/ai/config/paths.sh
 df -h "$HF_HOME"
+
+printf 'Qwen revision: %s\nDFlash2 revision: %s\n' "$QWEN_REV" "$DRAFT_REV"
 ```
 
 ### Ветка A — DGX Spark 64 ГБ
 
 ```bash
-docker pull vllm/vllm-openai:v0.28.0
-hf download nvidia/Qwen3.8-27B-NVFP4
-hf download z-lab/Qwen3.8-27B-DFlash2
+sudo docker pull vllm/vllm-openai:v0.28.0
+hf download nvidia/Qwen3.8-27B-NVFP4 --revision "$QWEN_REV"
+hf download z-lab/Qwen3.8-27B-DFlash2 --revision "$DRAFT_REV"
 df -h "$HF_HOME"
 ```
 
-Это соответствующие NVIDIA image и checkpoint IDs для 64-ГБ рецепта.[1][2]
+Это соответствующие NVIDIA image и checkpoint IDs для 64-ГБ рецепта.[20][65]
 
 ### Ветка B — DGX Spark 128 ГБ
 
-NVIDIA указывает для 128 ГБ image, закреплённый digest-ом. Если NGC отклоняет загрузку, настройте NGC-доступ на самом Spark; не вставляйте API key в этот документ или Git.
+Если `sudo docker pull` вернёт `unauthorized`, выполните интерактивную авторизацию в NGC самостоятельно. Docker сохранит учётные данные в root Docker config; не вставляйте API key в runbook, Git или чат. После успешной загрузки при желании очистите сохранённую авторизацию командой `sudo docker logout nvcr.io`.
 
 ```bash
-# При необходимости пройдите интерактивную авторизацию в NGC:
-docker login nvcr.io
+# Только если `sudo docker pull` отвечает unauthorized:
+sudo docker login nvcr.io
 
 # Image digest из таблицы официального NVIDIA-рецепта:
-docker pull nvcr.io/nvidia/vllm:26.10.pre1-py3@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929
-hf download nvidia/Qwen3.8-27B-NVFP4
-hf download z-lab/Qwen3.8-27B-DFlash2
+sudo docker pull nvcr.io/nvidia/vllm:26.10.pre1-py3@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929
+hf download nvidia/Qwen3.8-27B-NVFP4 --revision "$QWEN_REV"
+hf download z-lab/Qwen3.8-27B-DFlash2 --revision "$DRAFT_REV"
 df -h "$HF_HOME"
 ```
 
-Draft checkpoint необходим выбранному DFlash2 speculative-decoding launch-скрипту. Он не заменяет основной Qwen checkpoint.[1][3][5]
+Draft checkpoint необходим выбранному DFlash2 speculative-decoding launch-скрипту. Он не заменяет основной Qwen checkpoint.[20][66][68]
 
-Проверьте, что обе модели появились в Hub-кэше:
+Проверьте, что в Hub cache появились именно требуемые snapshots, а не только каталоги с именами моделей:
 
 ```bash
-find "$HF_HUB_CACHE" -maxdepth 1 -type d \
-  \( -name 'models--nvidia--Qwen3.8-27B-NVFP4' \
-  -o -name 'models--z-lab--Qwen3.8-27B-DFlash2' \) -print
-du -sh "$HF_HUB_CACHE"/models--nvidia--Qwen3.8-27B-NVFP4 \
-       "$HF_HUB_CACHE"/models--z-lab--Qwen3.8-27B-DFlash2
+for spec in \
+  "models--nvidia--Qwen3.8-27B-NVFP4:$QWEN_REV" \
+  "models--z-lab--Qwen3.8-27B-DFlash2:$DRAFT_REV"; do
+  repo_cache=${spec%%:*}
+  revision=${spec#*:}
+  snapshot="$HF_HUB_CACHE/$repo_cache/snapshots/$revision"
+  if [ ! -d "$snapshot" ]; then
+    printf 'Не найден требуемый snapshot: %s\n' "$snapshot" >&2
+    exit 1
+  fi
+  du -sh "$snapshot"
+done
 ```
 
-Hugging Face управляет структурой `hub`; не переименовывайте его snapshot/blob-файлы и не держите вторую копию тех же весов через `--local-dir`.[2][3]
+Hugging Face управляет структурой `hub`; не переименовывайте его snapshot/blob-файлы и не держите вторую копию тех же весов через `--local-dir`.[65][66]
 
 ## 3. Настроить DGX Spark как локальный inference-сервер
 
-Вендорские скрипты слушают только `127.0.0.1:8000`, включают Qwen tool-call parser и управляют временем жизни контейнера через NVIDIA Sync.[1][2][3] Для этого сценария не меняйте bind на `0.0.0.0` и не открывайте порт 8000 наружу.
+Вендорские скрипты слушают только `127.0.0.1:8000`, включают Qwen tool-call parser и управляют временем жизни контейнера через NVIDIA Sync.[20][65][66] Для этого сценария не меняйте bind на `0.0.0.0` и не открывайте порт 8000 наружу.
 
 ### 3.1 Загрузить pinned launch-скрипт и добавить пути хранения
 
@@ -175,50 +191,73 @@ curl -fL \
   -o "$SCRIPT"
 ```
 
-Добавьте в скачанную копию загрузку переменных путей **до** вычисления `HF_CACHE_DIR` и `mktemp`:
+После выбора одной ветки модифицируйте **только скачанную локальную копию** launcher: source paths, целевой checkpoint revision и draft revision. Сохраните vendor script отдельно; скрипт ниже прекращает работу при неожиданной структуре.
 
 ```bash
-python3 - "$SCRIPT" <<'PY'
+python3 - "$SCRIPT" "$QWEN_REV" "$DRAFT_REV" <<'PY'
 from pathlib import Path
+import json
 import sys
 
 p = Path(sys.argv[1])
+qwen_rev, draft_rev = sys.argv[2:]
 s = p.read_text()
+
 marker = "set -euo pipefail\n"
-if s.count(marker) != 1:
-    raise SystemExit("Неожиданное содержимое launcher; остановка без изменения файла")
-s = s.replace(marker, marker + "\nsource /srv/ai/config/paths.sh\n", 1)
+if s.count(marker) != 1 or "source /srv/ai/config/paths.sh" in s:
+    raise SystemExit("Неожиданный launcher/повторная модификация; файл не изменён")
+s = s.replace(marker, marker + "source /srv/ai/config/paths.sh\n", 1)
+
+target = "vllm serve nvidia/Qwen3.8-27B-NVFP4 " + chr(92) + "\n"
+if s.count(target) != 1:
+    raise SystemExit("Не найден ровно один target vllm serve; файл не изменён")
+s = s.replace(target, target + "    --revision " + qwen_rev + " " + chr(92) + "\n", 1)
+
+lines = s.splitlines()
+indices = [i for i, line in enumerate(lines) if "--speculative-config " in line]
+if len(indices) != 1:
+    raise SystemExit("Не найден ровно один --speculative-config; файл не изменён")
+i = indices[0]
+prefix, payload = lines[i].split("--speculative-config ", 1)
+payload = payload.strip()
+continued = payload.endswith(chr(92))
+if continued:
+    payload = payload[:-1].rstrip()
+if len(payload) < 2 or payload[0] != "'" or payload[-1] != "'":
+    raise SystemExit("Неожиданное shell quoting speculative config; файл не изменён")
+config = json.loads(payload[1:-1])
+if config.get("model") != "z-lab/Qwen3.8-27B-DFlash2":
+    raise SystemExit("Draft model ID не совпадает с ожидаемым; файл не изменён")
+if config.get("revision") not in (None, draft_rev):
+    raise SystemExit("В launcher уже задана другая draft revision; файл не изменён")
+config["revision"] = draft_rev
+new_payload = "'" + json.dumps(config, separators=(",", ":")) + "'"
+if continued:
+    new_payload += " " + chr(92)
+lines[i] = prefix + "--speculative-config " + new_payload
+s = "\n".join(lines) + ("\n" if s.endswith("\n") else "")
+
+if p.name.endswith("128gb.sh"):
+    image = "nvcr.io/nvidia/vllm:26.10.pre1-py3"
+    digest = image + "@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929"
+    if s.count(image) != 1:
+        raise SystemExit("128-ГБ image tag не найден ровно один раз; файл не изменён")
+    s = s.replace(image, digest, 1)
+
 p.write_text(s)
 PY
 ```
 
-**Дополнительная фиксация image для ветки 128 ГБ.** В опубликованной таблице NVIDIA для 128-ГБ рецепта указан digest, тогда как Sync-launcher этой ревизии запускает тот же image по тегу `26.10.pre1-py3`. Поэтому для воспроизводимости замените в **локальной копии** один image reference на тот же digest, который использовался в `docker pull` выше. Это единственное отличие от скачанного скрипта; остальные аргументы рецепта не меняйте.[1][3]
+Target model revision задаётся через `--revision`; vLLM 0.28 документирует отдельное поле `revision` для draft-модели в `--speculative-config`.[88][89] 128-ГБ NGC image не запускался в этой работе; после отдельного разрешения перед стартом проверьте внутри выбранного image, что `vllm serve --help` принимает `--revision` и draft `revision`. Если аргументы не распознаются, остановитесь и не запускайте неприкреплённую модель.
 
-```bash
-if [ "${SCRIPT##*qwen-}" = "128gb.sh" ]; then
-  python3 - "$SCRIPT" <<'PY'
-from pathlib import Path
-import sys
-
-p = Path(sys.argv[1])
-s = p.read_text()
-old = "nvcr.io/nvidia/vllm:26.10.pre1-py3"
-new = old + "@sha256:cb38bbefdbc3e9fe045f931dd72cbd58cd48985c7e09916bcc6c15c10f39b929"
-if s.count(old) != 1:
-    raise SystemExit("Image tag не найден ровно один раз; остановка")
-p.write_text(s.replace(old, new, 1))
-PY
-fi
-```
-
-В любом случае проверьте, что файл — ожидаемый bash-скрипт:
+После изменения проверьте скрипт и параметры:
 
 ```bash
 bash -n "$SCRIPT"
-grep -nE 'HF_HOME|HF_CACHE_DIR|127\.0\.0\.1|PORT=|vllm serve|docker rm -f' "$SCRIPT"
+grep -nE 'HF_HOME|HF_CACHE_DIR|127\.0\.0\.1|--revision|speculative-config|vllm serve|docker rm -f' "$SCRIPT"
 ```
 
-Скрипт удаляет контейнер с конкретным именем `vllm-spark-...-qwen38-27b` перед созданием нового. До запуска просмотрите `docker ps -a`; не запускайте его, если в системе есть важный контейнер с этим именем.[2][3]
+Скрипт удаляет контейнер с конкретным именем `vllm-spark-...-qwen38-27b` перед созданием нового. До запуска проверьте существующие контейнеры через `sudo docker ps -a`; не запускайте его, если в системе есть важный контейнер с этим именем.[65][66]
 
 ### 3.2 Разложить временные runtime-кэши
 
@@ -238,72 +277,66 @@ ln -s /srv/ai/cache/flashinfer "$HOME/.cache/flashinfer"
 ln -s /srv/ai/cache/triton "$HOME/.triton"
 ```
 
-Для 128-ГБ скрипта **не** создавайте эти ссылки без причины: его комментарий требует сохранить prebuilt kernel/autotune cache внутри image; скрипт монтирует только Hugging Face cache.[3]
+Для 128-ГБ скрипта **не** создавайте эти ссылки без причины: его комментарий требует сохранить prebuilt kernel/autotune cache внутри image; скрипт монтирует только Hugging Face cache.[66]
 
-### 3.3 Добавить приложение NVIDIA Sync
+### 3.3 Docker-доступ для этого устройства
 
-В NVIDIA Sync:
+По сообщённым владельцем правам обычный пользователь не может обращаться к Docker socket без `sudo`. Поэтому в этом runbook основной путь — ручной запуск launcher через `sudo bash` и SSH-туннель. **Не** добавляйте пользователя в группу `docker` автоматически: это привилегии уровня root.
 
-1. Подключитесь к Spark.
-2. Откройте **Custom → + Add New**.
-3. Для **Name** укажите `vLLM-Qwen3.8-27B-64GB` или `vLLM-Qwen3.8-27B-128GB` согласно модели устройства.
-4. В **Port** укажите `8000`.
-5. Вставьте содержимое соответствующего проверенного файла `launch-qwen-64gb.sh` или `launch-qwen-128gb.sh` в **Launch Script**.
-6. Оставьте **Auto open** и **Launch in Terminal** выключенными, **URL Path** пустым; нажмите **Add**.
+NVIDIA Sync Custom App может запускать этот Docker launcher только при наличии доступа к Docker daemon. Не настраивайте Custom App и не принимайте предложение добавить пользователя в группу без отдельного решения владельца. До такого решения используйте только описанный ниже условный ручной путь; на Spark он не запускался.
 
-NVIDIA Sync сам делает SSH-туннель и проброс порта к ноутбуку. Запуск рецепта на 128-ГБ Spark требует отдельной проверки старта и логов: вендор отмечает, что Sync-адаптация для этого профиля требует проверки на конкретном Spark.[1]
+## 4. Подключить Windows-ПК по SSH-туннелю
 
-## 4. Подключить Windows-ПК к серверу
-
-### Вариант A — NVIDIA Sync
-
-Подключение и проброс порта делает Sync. После запуска приложения на Spark адрес с Windows-ПК:
-
-```text
-http://127.0.0.1:8000/v1
-```
-
-### Вариант B — обычный SSH-туннель
-
-Используйте его, если не применяете port forwarding NVIDIA Sync. В PowerShell на Windows оставьте это окно открытым:
+Поскольку для текущего аккаунта Docker доступен только через `sudo`, ручной запуск и обычный SSH-туннель — основной путь. В PowerShell на Windows оставьте это окно открытым; замените placeholders на адрес и имя учётной записи, настроенной владельцем:
 
 ```powershell
 $sparkUser = Read-Host 'Имя пользователя на Spark'
-$sparkAddress = Read-Host 'IP-адрес или имя Spark'
+$sparkAddress = Read-Host 'IP-адрес или SSH alias Spark'
 ssh -N -L 8000:127.0.0.1:8000 "$sparkUser@$sparkAddress"
 ```
 
-Замените только имя пользователя и адрес Spark. Не запускайте одновременно два проброса одного и того же локального порта. Туннель нужен, потому что vLLM намеренно слушает loopback-интерфейс Spark, а не всю локальную сеть.[1][2][3]
+Не публикуйте адрес/имя устройства в Git или логах. Не запускайте два туннеля на один локальный порт. vLLM слушает loopback; SSH перенаправляет локальный порт, не открывая API в LAN.[20][65][66]
+
+NVIDIA Sync forwarding остаётся необязательным вариантом только после того, как владелец отдельно выберет безопасный способ дать Sync доступ к Docker. Добавление в группу `docker` не выполнять автоматически.
 
 ## 5. Запустить Qwen и проверить API
 
-В NVIDIA Sync нажмите созданное custom-приложение. Для ручного запуска из терминала Spark вместо кнопки Sync выполните и оставьте команду работать в этом терминале:
+**На целевом 128-ГБ Spark запускайте только эту ветку.** Все команды в разделах загрузки и запуска намеренно не выполняются в текущем этапе: владелец разрешил завершить документы, но пока запретил установку моделей. При отдельном разрешении сначала осмотрите контейнеры и запускайте только локальную копию pinned launcher.
 
 ```bash
+sudo docker ps -a
 source /srv/ai/config/paths.sh
-bash /srv/ai/apps/vllm/launch-qwen-64gb.sh
-# либо для 128 ГБ:
-# bash /srv/ai/apps/vllm/launch-qwen-128gb.sh
+sudo bash /srv/ai/apps/vllm/launch-qwen-128gb.sh
 ```
 
-Для просмотра логов откройте второй терминал Spark:
+`sudo` нужен для текущих прав Docker socket. Не добавляйте пользователя в группу `docker`. После запуска оставьте этот терминал открытым: `Ctrl+C` завершит launcher, а его cleanup остановит и удалит созданный им контейнер.
+
+Только если фактическая система окажется 64-ГБ конфигурацией, используйте её отдельный скрипт вместо 128-ГБ; не запускайте обе ветки подряд:
 
 ```bash
-# 64 ГБ
-docker logs --tail 50 --follow vllm-spark-64gb-qwen38-27b
-
-# 128 ГБ
-docker logs --tail 50 --follow vllm-spark-128gb-qwen38-27b
+sudo docker ps -a
+source /srv/ai/config/paths.sh
+sudo bash /srv/ai/apps/vllm/launch-qwen-64gb.sh
 ```
 
-Дождитесь сообщения о готовности vLLM. Первый старт может занять время на компиляцию runtime и загрузку весов. Затем проверьте API **на Spark**:
+Для просмотра журналов откройте второй терминал Spark:
+
+```bash
+# 128 ГБ (целевой профиль)
+sudo docker logs --tail 50 --follow vllm-spark-128gb-qwen38-27b
+
+# Только для отдельной 64-ГБ конфигурации
+sudo docker logs --tail 50 --follow vllm-spark-64gb-qwen38-27b
+```
+
+Дождитесь сообщения о готовности vLLM. 128-ГБ image ещё не запускался на устройстве владельца; команда выше — инструкция на будущее, не результат теста. Затем проверьте API **на Spark**:
 
 ```bash
 curl --fail-with-body -i http://127.0.0.1:8000/health
 curl --fail-with-body -sS http://127.0.0.1:8000/v1/models
 ```
 
-В PowerShell на Windows проверьте доступ через Sync или SSH-туннель и отправьте короткий запрос:
+В PowerShell на Windows после установления SSH-туннеля проверьте доступность API и отправьте короткий запрос:
 
 ```powershell
 $models = Invoke-RestMethod http://127.0.0.1:8000/v1/models
@@ -318,11 +351,11 @@ Invoke-RestMethod http://127.0.0.1:8000/v1/chat/completions `
   -Method Post -ContentType 'application/json' -Body $body
 ```
 
-Для остановки нажмите **Stop** у custom app в NVIDIA Sync. При ручном запуске нажмите `Ctrl+C` в терминале, где выполняется launcher; скрипт остановит и удалит созданный им контейнер.[2][3]
+Для остановки нажмите `Ctrl+C` в терминале, где запущен `sudo bash .../launch-qwen-128gb.sh`; launcher обработает сигнал и остановит/удалит созданный им контейнер. После остановки проверьте `sudo docker ps -a`.[65][66]
 
 ## 6. Подключить модель к Hermes на Windows
 
-Сначала убедитесь, что Sync forwarding или SSH-туннель работает и `Invoke-RestMethod http://127.0.0.1:8000/v1/models` возвращает список. Возьмите точный `id` из этого ответа; не подставляйте имя наугад.
+Сначала убедитесь, что SSH-туннель работает и `Invoke-RestMethod http://127.0.0.1:8000/v1/models` возвращает список. Возьмите точный `id` из этого ответа; не подставляйте имя наугад.
 
 В PowerShell на ПК запустите мастер:
 
@@ -336,7 +369,7 @@ hermes model
 - **API key:** оставить пустым — в NVIDIA launcher не включена проверка `--api-key`
 - **Model:** точный `id` из `/v1/models`, обычно `nvidia/Qwen3.8-27B-NVFP4`
 
-Hermes официально поддерживает self-hosted OpenAI-compatible endpoints через `provider: custom`, `base_url` и имя модели.[6] Проверить сохранённую конфигурацию:
+Hermes официально поддерживает self-hosted OpenAI-compatible endpoints через `provider: custom`, `base_url` и имя модели.[69] Проверить сохранённую конфигурацию:
 
 ```powershell
 hermes config check
@@ -344,39 +377,32 @@ hermes config get model --json
 hermes status
 ```
 
-Откройте **новый чат Hermes**: изменённая модель применяется к новым сессиям. Выполните короткий текстовый запрос. После этого отдельно проверьте один tool call в Hermes: успешный ответ `/v1/chat/completions` сам по себе ещё не доказывает работу вызова инструментов. Официальный NVIDIA launcher включает Qwen parser и auto-tool-choice, но реальное поведение нужно проверить на своей конфигурации.[2][3]
+Откройте **новый чат Hermes**: изменённая модель применяется к новым сессиям. Выполните короткий текстовый запрос. После этого отдельно проверьте один tool call в Hermes: успешный ответ `/v1/chat/completions` сам по себе ещё не доказывает работу вызова инструментов. Официальный NVIDIA launcher включает Qwen parser и auto-tool-choice, но реальное поведение нужно проверить на своей конфигурации.[65][66]
 
-## 7. Публикация инструкции в GitHub
 
-Эта инструкция находится в `model/Qwen3.8-27B/README.md`; ссылка на неё добавлена в `docs/model-install-plan.md`. Для публикации будущих правок из локального клона репозитория выполните в PowerShell:
 
-```powershell
-$repo = Read-Host 'Введите полный путь к локальному клону Developer_Toolkit_Recommendations'
-Set-Location $repo
-git pull --ff-only
-git add model/Qwen3.8-27B/README.md docs/model-install-plan.md
-git diff --cached --check
-git diff --cached --name-only
-git diff --cached
-git commit -m "docs: add Qwen3.8 DGX Spark setup guide"
-git push
-```
 
-Перед `git commit` убедитесь, что в staged diff только ожидаемые Markdown-файлы, и используйте настроенную Git-идентичность. Никогда не добавляйте в репозиторий `HF_TOKEN`, NGC API key, пароли, содержимое `.env`, скачанные веса или логи.
+
+
 
 ## Ограничения и безопасность
 
-- Эти команды не были выполнены на Spark; конфигурацию 64/128 ГБ, свободное место и существующие контейнеры нужно проверить непосредственно на устройстве.
-- Разница между памятью и диском важна: несколько checkpoint можно хранить на SSD, но не следует ожидать, что они одновременно поместятся в общую память.
-- Оставляйте API на `127.0.0.1` и используйте Sync/SSH forwarding. Не публикуйте неаутентифицированный vLLM endpoint в LAN или интернет.
-- В группе `docker` фактически есть root-эквивалентный доступ. Если NVIDIA Sync предложит добавить пользователя в группу, принимайте это только если согласны с этим уровнем доступа.[1]
+- По переданному владельцем preflight устройство соответствует 128-ГБ профилю. Агент к Spark не подключался; checkpoint, image и модели не скачивались, установка и аппаратные тесты не выполнялись.
+- Разделяйте дисковое хранение и unified memory: свободное место на SSD не означает, что несколько checkpoint одновременно поместятся в RAM/VRAM.
+- Оставляйте API на `127.0.0.1` и используйте SSH forwarding; не публикуйте неаутентифицированный vLLM endpoint в LAN или интернет.
+- Docker group даёт привилегии уровня root. Не меняйте членство без отдельного согласия владельца; описанный manual path использует `sudo` и тоже пока не запускался.
+- Поддержка revision-параметров в закреплённом 128-ГБ NGC image не проверялась runtime-тестом; перед запуском после отдельного разрешения сверяйте его встроенный `vllm serve --help`.
 
 ## Sources
 
-[1] https://build.nvidia.com/spark/vllm/intermediate
-[2] https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/30883150541743d580c9c347700c6ac99fc396d2/nvidia/playbook-vllm/assets/sync-vllm-spark-64gb-qwen38-27b.sh
-[3] https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/30883150541743d580c9c347700c6ac99fc396d2/nvidia/playbook-vllm/assets/sync-vllm-spark-128gb-qwen38-27b.sh
-[4] https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4
-[5] https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2
-[6] https://hermes-agent.nousresearch.com/docs/integrations/providers
-[7] https://huggingface.co/docs/huggingface_hub/en/guides/cli
+[13] https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4
+[20] https://build.nvidia.com/spark/vllm/intermediate
+[53] https://huggingface.co/docs/huggingface_hub/en/guides/cli
+[65] https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/30883150541743d580c9c347700c6ac99fc396d2/nvidia/playbook-vllm/assets/sync-vllm-spark-64gb-qwen38-27b.sh
+[66] https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/30883150541743d580c9c347700c6ac99fc396d2/nvidia/playbook-vllm/assets/sync-vllm-spark-128gb-qwen38-27b.sh
+[68] https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2
+[69] https://hermes-agent.nousresearch.com/docs/integrations/providers
+[77] https://huggingface.co/api/models/nvidia/Qwen3.8-27B-NVFP4?blobs=true
+[78] https://huggingface.co/api/models/z-lab/Qwen3.8-27B-DFlash2?blobs=true
+[88] https://docs.vllm.ai/en/v0.28.0/api/vllm/config/speculative
+[89] https://docs.vllm.ai/en/v0.28.0/cli/serve
