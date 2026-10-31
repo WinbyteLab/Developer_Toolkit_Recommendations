@@ -32,7 +32,7 @@ sudo docker info --format '{{.ServerVersion}}'
 ## 2. Выберите отдельное руководство
 
 | Задача | Руководство |
-|---|---|
+| --- | --- |
 | План моделей, порядок установки и размещение данных | [План моделей и хранения](./docs/model-install-plan.md) |
 | Coding API Qwen3.8-27B; отдельные ветки 64/128 ГБ | [Qwen3.8-27B runbook](./model/Qwen3.8-27B/README.md) |
 | Генерация изображений ComfyUI + Z-Image-Turbo | [ComfyUI/Z-Image-Turbo runbook](./docs/comfyui-zimage.md) |

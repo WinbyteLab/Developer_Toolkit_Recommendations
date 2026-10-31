@@ -5,7 +5,7 @@
 ## Начните здесь
 
 | Если вы хотите… | Откройте |
-|---|---|
+| --- | --- |
 | понять порядок работ и хранение данных | [План моделей и хранения](./docs/model-install-plan.md) |
 | увидеть общий набор команд для Spark | [Краткий указатель DGX Spark](./DGX_Spark_Setup_Commands.md) |
 | поднять coding API на Qwen | [Qwen3.8-27B: отдельный runbook](./model/Qwen3.8-27B/README.md) |

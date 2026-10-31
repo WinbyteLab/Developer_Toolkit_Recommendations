@@ -7,7 +7,7 @@ DGX Spark в предлагаемой схеме предоставляет infe
 ## Матрица инструментов
 
 | Задача | Инструмент | Где запускать | Проверка результата |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Подключить локальную coding-модель к редактору | Continue с OpenAI-совместимым endpoint | IDE на Windows; API доступен через защищённый SSH-туннель к Spark | Получить model ID из `/v1/models`; выполнить тестовый запрос.[39] |
 | Android-разработка | Android Studio, Android SDK, Gradle Wrapper, эмулятор или устройство | Windows 11 | Сборку и тесты запускать Gradle Wrapper из корня проекта.[40][47][62] |
 | Windows desktop-разработка | Стек проекта: WinUI/Windows App SDK, WPF, WinForms или Win32 | Windows 11 | Проверять реальную сборку и UI в Windows-среде.[44] |

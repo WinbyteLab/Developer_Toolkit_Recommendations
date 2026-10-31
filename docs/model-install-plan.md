@@ -9,7 +9,7 @@
 ### Первый этап
 
 | Приоритет | Идентификатор | Назначение | Условия запуска |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | [`nvidia/Qwen3.8-27B-NVFP4`](https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4) | Основная coding-модель и локальный API для Windows IDE | Использовать соответствующий официальный [рецепт vLLM для DGX Spark](https://build.nvidia.com/spark/vllm/intermediate). Сначала установить только её и проверить фактическую память, диск, готовность API и тестовый запрос. |
 | 1a | [`z-lab/Qwen3.8-27B-DFlash2`](https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2) | Вспомогательная draft-модель, требуемая некоторыми вариантами рецепта Qwen для speculative decoding | Загружать только если это предусмотрено выбранным NVIDIA-рецептом; учитывать в манифесте и расчёте места. |
 | 2 | [`Comfy-Org/z_image_turbo`](https://huggingface.co/Comfy-Org/z_image_turbo) — BF16 baseline files | Генерация иллюстраций, фонов и концептов через ComfyUI | Только baseline bundle из трёх файлов, который использует NVIDIA setup script; устанавливать после проверки coding-модели и отдельного разрешения. `Tongyi-MAI/Z-Image-Turbo` — upstream-источник, не repo весов из этого recipe. Сверить файлы и каталог с [NVIDIA quick start](https://build.nvidia.com/spark/comfyui/image-gen-quick-start) и [отдельным runbook](./comfyui-zimage.md). |
@@ -19,7 +19,7 @@
 Ниже — отложенные компоненты, не часть первоначальной установки. Для каждого сначала определить сценарий и точный checkpoint, проверить лицензию, выбрать совместимый runtime и описать end-to-end процедуру; до проверки на целевой среде не включать компонент в baseline и не скачивать.
 
 | Идентификатор | Для чего | Решение |
-|---|---|---|
+| --- | --- | --- |
 | FLUX.2 Klein 4B | Редактирование изображений и работа с референсами | Опционально позже; не включать в первоначальный baseline. Сверить workflow с выбранной версией ComfyUI по [ComfyUI guide](https://docs.comfy.org/tutorials/flux/flux-2-klein) и выполнить сквозной тест на целевой среде; runtime и DGX Spark workflow пока не проверены. |
 | [black-forest-labs/FLUX.2-klein-9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) | Генерация и редактирование изображений | Не включать в коммерческий/производственный baseline: точный checkpoint распространяется по [FLUX Non-Commercial License](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B/blob/main/LICENSE.md). Рассматривать только для подходящего некоммерческого сценария, после проверки лицензии, выбора runtime/workflow и сквозного теста на целевой системе. |
 | `Qwen/Qwen3-Embedding-0.6B` + `Qwen/Qwen3-Reranker-0.6B` | Поиск по большой локальной кодовой базе | Отложить до выбора retrieval-стека и end-to-end процедуры индексации, поиска и rerank на целевой среде. |

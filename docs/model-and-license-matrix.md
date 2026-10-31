@@ -15,7 +15,7 @@ NVIDIA публикует отдельные vLLM-рецепты для Spark н
 ## Приоритет внедрения: базовые кандидаты и отложенные компоненты
 
 | Уровень | Компоненты | Условие выбора сейчас |
-|---|---|---|
+| --- | --- | --- |
 | Основной кандидат для coding API | `nvidia/Qwen3.8-27B-NVFP4` + `z-lab/Qwen3.8-27B-DFlash2` | Для 128-ГБ профиля документирован vLLM recipe; модели не скачивались, точная совместимость CLI NGC image и запуск на Spark не проверены.[20][66][68] |
 | Кандидат на генерацию изображений | `Comfy-Org/z_image_turbo` BF16 bundle | Три BF16 файла и workflow зафиксированы; соответствие статически проверено, но модель не скачивалась и workflow на Spark не запускался.[67][79][93] |
 | Опционально позже | FLUX.2 Klein 4B | Нужны конкретный сценарий, выбранные runtime/workflow и успешная E2E-проверка на целевой среде; совместимость Spark пока не подтверждена.[26][74][80] |
@@ -25,7 +25,7 @@ NVIDIA публикует отдельные vLLM-рецепты для Spark н
 | Не подменять baseline автоматически | Z-Image INT8 / NVFP4 | Для вариантов нужны отдельные workflow и совместимые пары encoder; runtime на Spark не проверен.[72][94][102] |
 
 | Точный checkpoint | Задача, runtime и память | Revision и место на диске | Лицензия | Подтверждение и статус |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `nvidia/Qwen3.8-27B-NVFP4` — 27B, mixed NVFP4/FP8 | Coding/chat API через vLLM. 64-ГБ recipe: `vllm/vllm-openai:v0.28.0`; 128-ГБ target: `nvcr.io/nvidia/vllm:26.10.pre1-py3` с digest из runbook. Пользователь сообщил 128 ГБ unified memory; peak usage модели не измерялся | SHA `482ca0f3832238542f8f5295dde86b5f22711d80`; весь репозиторий 21.95 GB.[77] | Apache-2.0 для этого checkpoint.[13] | NVIDIA recipe и shell syntax проверены.[66] Qwen runbook фиксирует target revision; поддержка параметра в 128-ГБ image остаётся pending. На Spark не скачивался и не запускался. |
 | `z-lab/Qwen3.8-27B-DFlash2` | Draft-модель для speculative decoding вместе с целевым Qwen; не самостоятельная чат-модель. Используется NVIDIA vLLM launcher; отдельный memory minimum не указан, учитывать как дополнительную нагрузку | SHA `50307d4c4cde6860d4eee73e2547cd786fe8e8a4`; весь репозиторий 3.85 GB.[78] | Apache-2.0.[68] | NVIDIA launcher использует checkpoint как draft.[66] Qwen runbook теперь закрепляет draft revision в загрузке и speculative config; support в 128-ГБ image pending. На Spark не скачивалась и не запускалась. |
 | `Qwen/Qwen3-Embedding-0.6B` | Text embedding (`feature-extraction`); runtime и endpoint проекта не выбраны; отдельный Spark memory minimum в карточке не указан | SHA `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`; репозиторий 1.21 GB; 0.6B, context 32K | Apache-2.0 | Задача/metadata проверены. Нет выбранного retrieval-сервера, индекса или end-to-end теста; не установлена.[30][82] |
@@ -36,7 +36,7 @@ NVIDIA публикует отдельные vLLM-рецепты для Spark н
 ## Генерация и редактирование изображений
 
 | Точный checkpoint / файл | Задача, runtime и память | Revision и место на диске | Лицензия | Подтверждение и статус |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `Comfy-Org/z_image_turbo`: `z_image_turbo_bf16.safetensors` + `qwen_3_4b.safetensors` + `ae.safetensors` | Baseline Z-Image-Turbo text-to-image в ComfyUI: diffusion model + text encoder + VAE | SHA `6fc90a3b1b653e935a0d175e260736de25b84df5`; выбранные файлы около 20.69 GB (12.31 + 8.04 + 0.34 GB). Весь repo с альтернативами — 40.67 GB | Apache-2.0 у repackaged Comfy-Org repo | Именно эти файлы использует NVIDIA setup script для ComfyUI `v0.33.2`. Опубликованный script использует изменяемый `main`, но runbook фиксирует локальную копию на Hub snapshot; преобразование и model/workflow pairing статически проверены. Загрузки и генерации на Spark не было.[67][79][93] |
 | `Comfy-Org/z_image_turbo`: `z_image_turbo_int8_convrot.safetensors` | Альтернативная INT8 diffusion weight для ComfyUI; paired encoder/workflow нужно выбирать совместно | Та же SHA `6fc90a3b1b653e935a0d175e260736de25b84df5`; diffusion-файл 6.20 GB; encoder/VAE отдельно | Apache-2.0 у Comfy-Org repo | Файл и отдельный INT8 workflow перечислены в карточке. NVIDIA Spark setup script этот вариант не загружает; workflow/loader и GB10 не тестировались.[72][79][94] |
 | `Comfy-Org/z_image_turbo`: `z_image_turbo_nvfp4.safetensors` | Альтернативная NVFP4 diffusion weight; требуется совместимый encoder, loader и workflow | Та же SHA; diffusion-файл 4.51 GB; encoder/VAE отдельно | Apache-2.0 у Comfy-Org repo | Файл присутствует в pinned Hub snapshot, но в просмотренном `templates/` snapshot нет NVFP4 workflow; pairing encoder/loader не подтверждён. В baseline не включён; совместимость и память на Spark не проверялись.[72][79][102] |
@@ -51,13 +51,13 @@ Comfy-Org также перечисляет encoder-файлы `qwen_3_4b_fp4_mi
 ## OCR
 
 | Точный checkpoint | Задача, runtime и память | Revision и место на диске | Лицензия | Подтверждение и статус |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `deepseek-ai/DeepSeek-OCR-2` | OCR/image-text-to-text; card sample uses Python 3.12.9, PyTorch 2.6.0, Transformers 4.46.3, CUDA 11.8 and FlashAttention 2.7.3; GB10 peak memory not specified | SHA `aaa02f3811945a91062062994c5c4a3f4c0af2b0`; весь repo 6.79 GB; 3B BF16 | Apache-2.0 | Metadata и пример проверены. Пример карточки не доказывает совместимость с DGX Spark/CUDA в этом проекте; отдельного Spark recipe и теста нет. Отложен.[33][84] |
 
 ## Инструменты и лицензии
 
 | Компонент | Назначение | Лицензия/статус |
-|---|---|---|
+| --- | --- | --- |
 | Material Symbols / Lucide | Готовые векторные UI-иконки | Apache-2.0 / ISC соответственно; проверять условия выбранного набора.[45][46] |
 | Android Image Asset Studio | Android launcher/notification assets | Инструмент Android Studio; сборка приложения на Spark не выполняется.[34] |
 | Visual Studio asset tools | Windows app icons/assets | Отдельный Windows workflow; проект проверять на Windows.[35][36] |

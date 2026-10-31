@@ -1,7 +1,9 @@
 {
   "config": {
     "MD013": false,
-    "MD034": false
+    "MD034": false,
+    // Numeric [n] citations are checked separately by scripts/check_docs.py.
+    "MD052": false
   },
   "globs": [
     "**/*.md"

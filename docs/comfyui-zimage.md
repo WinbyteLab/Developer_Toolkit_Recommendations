@@ -122,7 +122,7 @@ Pinned BF16 workflow JSON имеет format `0.4`, указывает `frontendV
 ## Варианты Z-Image и совместимость workflow
 
 | Вариант | Пара файлов из карточки/workflow | Статус в этом runbook |
-|---|---|---|
+| --- | --- | --- |
 | **BF16 baseline** | `z_image_turbo_bf16.safetensors` + `qwen_3_4b.safetensors` + `ae.safetensors` | Совпадает с NVIDIA setup и официальным `image_z_image_turbo.json`; это единственный baseline ниже. Шаблон загружайте после проверки, что эти три pinned-файла уже лежат в соответствующих каталогах.[67][79][93] |
 | **INT8** | `z_image_turbo_int8_convrot.safetensors` + `qwen_3_4b_fp8_mixed.safetensors` + `ae.safetensors` | Отдельный `image_z_image_turbo_int8.json` называет именно INT8 diffusion и FP8 encoder. NVIDIA baseline script их не ставит; совместимость workflow с закреплённым ComfyUI tag и GB10 остаётся непроверенной. Не заменять BF16-файл или encoder по отдельности.[72][79][94] |
 | **NVFP4** | `z_image_turbo_nvfp4.safetensors` (и отдельно выбранные encoder/VAE) | Файл присутствует в Hub snapshot.[79] В просмотренном pinned `templates/` snapshot нет отдельного NVFP4 workflow; matching pairing/loader не подтверждён, поэтому вариант не входит в baseline и не тестировался.[72][102] |
@@ -134,7 +134,6 @@ Pinned BF16 workflow JSON имеет format `0.4`, указывает `frontendV
 Полная сводка checkpoint, ревизий, размеров и лицензий находится в [технической матрице](./model-and-license-matrix.md); фактический статус установки и тестов — в [матрице валидации](./validation-status.md).
 
 ## Запуск только на loopback
-
 
 Не используйте `--listen 0.0.0.0` для этого сценария: это открывает web UI на сетевых интерфейсах. ComfyUI поддерживает явные `--listen` и `--port`; для локального SSH-туннеля укажите loopback.[49][101]
 
