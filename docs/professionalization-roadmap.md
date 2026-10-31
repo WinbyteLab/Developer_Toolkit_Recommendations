@@ -68,7 +68,7 @@ Hostname, имя пользователя и другие идентификат
 **Жёсткий предел:** пока ни одна модель не запускалась на Spark, раздел аппаратной проверки не может получить баллы. Документация может быть опубликована как зрелый план и runbook, но общий результат нельзя объявлять 5/5 или 100/100 до успешной аппаратной приёмки.
 
 ## Sources
-
+https://huggingface.co/Qwen/Qwen3.8-27B
 [13] https://huggingface.co/nvidia/Qwen3.8-27B-NVFP4
 [20] https://build.nvidia.com/spark/vllm/intermediate
 [26] https://docs.comfy.org/tutorials/flux/flux-2-klein
