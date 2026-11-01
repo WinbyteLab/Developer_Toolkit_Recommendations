@@ -9,12 +9,23 @@
 
 ## Порядок установки
 
-1. Подготовьте Spark и проверьте архитектуру, память, диск и доступ к Docker.
-2. Установите Qwen3.8-27B как локальный coding API.
-3. Проверьте API через SSH-туннель с рабочего компьютера.
-4. При необходимости отдельно установите ComfyUI и Z-Image-Turbo для генерации изображений.
+1. **Настроить сеть DGX Spark.** До включения подключите Ethernet-кабель к локальной сети с доступом в интернет, затем завершите [первичную настройку DGX Spark](https://docs.nvidia.com/dgx/dgx-spark/first-boot.html). После неё запишите имя узла и IP-адрес (`hostname`, `hostname -I`). Для прямого подключения NVIDIA Sync компьютер с Windows должен быть в той же сети.[10][12]
 
-Сначала устанавливайте и проверяйте один сценарий. Перед запуском ComfyUI остановите vLLM: обе модели используют общую память Spark.
+2. **Подключить NVIDIA Sync на Windows.** Установите [NVIDIA Sync](https://docs.nvidia.com/sync/latest/getting-started.html), пройдите onboarding и добавьте Spark по найденному в сети имени mDNS либо вручную по IP-адресу. Для SSH-подключения используйте порт `22` и учётную запись Spark; затем подключитесь и откройте удалённый терминал. Если Sync предложит добавить пользователя в группу `docker`, откажитесь: Qwen runbook использует `sudo`.[11][12][13]
+
+3. **Установить Qwen3.8-27B.** В удалённом терминале NVIDIA Sync выполните [Qwen runbook для конфигурации 128 ГБ](./model/Qwen3.8-27B/README.md) без замены image, checkpoint или параметров. После запуска убедитесь, что API отвечает на `127.0.0.1:8000`, `/health` успешен, а `/v1/models` возвращает точный ID модели.
+
+4. **Подключить локальный API в Hermes.** NVIDIA Sync используйте для доступа к Spark и удалённому терминалу; для Hermes оставьте API на loopback и откройте SSH-туннель с Windows в отдельном PowerShell:
+
+   ```powershell
+   $sparkUser = Read-Host 'Имя пользователя на Spark'
+   $sparkAddress = Read-Host 'IP-адрес или SSH alias Spark'
+   ssh -N -L 8000:127.0.0.1:8000 "$sparkUser@$sparkAddress"
+   ```
+
+   Не закрывайте это окно, пока Hermes использует API. В другом терминале выполните `hermes model` и выберите **Custom endpoint (self-hosted / vLLM / etc.)**. Укажите Base URL `http://127.0.0.1:8000/v1`, точный model ID из `/v1/models` и оставьте API key пустым: выбранный NVIDIA launcher не включает проверку API-ключа.[14] Затем проверьте `hermes config check`, `hermes config get model --json` и `hermes status`; начните новый чат и отправьте тестовый запрос.
+
+5. **По желанию установить генерацию изображений.** Остановите vLLM и выполните [ComfyUI + Z-Image-Turbo runbook](./docs/comfyui-zimage.md). Сначала запустите BF16 baseline и проверьте сохранённый результат; не запускайте одновременно с Qwen, поскольку обе нагрузки используют unified memory Spark.
 
 ## Что устанавливается
 
@@ -107,3 +118,13 @@ sudo docker info --format '{{.ServerVersion}}'
 [8] https://huggingface.co/Comfy-Org/z_image_turbo
 
 [9] https://huggingface.co/api/models/Comfy-Org/z_image_turbo
+
+[10] https://docs.nvidia.com/dgx/dgx-spark/first-boot.html
+
+[11] https://docs.nvidia.com/sync/latest/getting-started.html
+
+[12] https://docs.nvidia.com/sync/latest/direct-connections.html
+
+[13] https://docs.nvidia.com/sync/latest/applications.html
+
+[14] https://hermes-agent.nousresearch.com/docs/integrations/providers
