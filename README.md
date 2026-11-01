@@ -1,10 +1,11 @@
-# DGX Spark 128 ГБ: установка локальных AI-моделей
+<!-- markdownlint-disable MD041 -->
+![Баннер руководства: DGX Spark GB10, 128 ГБ, Qwen API и дополнительная генерация изображений](./assets/dgx-spark-128gb-banner.svg)
 
 ![DGX Spark 128 ГБ](https://img.shields.io/badge/DGX_Spark-128_GB-1f9d8b?style=for-the-badge&logo=nvidia&logoColor=white) ![Ubuntu 24.04 ARM64](https://img.shields.io/badge/OS-Ubuntu_24.04_ARM64-e95420?style=for-the-badge&logo=ubuntu&logoColor=white)
 
-![Баннер руководства: DGX Spark GB10, 128 ГБ, Qwen API и дополнительная генерация изображений](./assets/dgx-spark-128gb-banner.svg)
+# DGX Spark 128 ГБ: установка локальных AI-моделей
 
-Практическое руководство для **NVIDIA DGX Spark GB10 с 128 ГБ unified memory** и Ubuntu 24.04 ARM64. Все команды и рецепты в этом руководстве относятся только к этой конфигурации. Ветки для других объёмов памяти здесь нет.
+Руководство описывает последовательное развёртывание Qwen3.8-27B (mixed NVFP4/FP8) как vLLM inference API и дополнительного контура генерации изображений ComfyUI + Z-Image-Turbo на NVIDIA DGX Spark GB10 с 128 ГБ unified memory и Ubuntu 24.04.5 LTS ARM64; команды и параметры runtime рассчитаны исключительно на этот аппаратно-программный профиль.
 
 ## Порядок установки
 
