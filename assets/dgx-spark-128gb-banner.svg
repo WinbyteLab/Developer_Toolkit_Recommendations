@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
+  <title id="title">DGX Spark 128 GB: установка локальных AI-моделей</title>
+  <desc id="description">Инженерное руководство для конфигурации DGX Spark 128 ГБ: Qwen API и дополнительный ComfyUI с Z-Image.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#081522"/>
+      <stop offset="0.58" stop-color="#10283a"/>
+      <stop offset="1" stop-color="#102038"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#55e4ca"/>
+      <stop offset="1" stop-color="#63a9ff"/>
+    </linearGradient>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" fill="none" stroke="#d8f4ff" stroke-opacity="0.055" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="300" rx="22" fill="url(#background)"/>
+  <rect width="1200" height="300" rx="22" fill="url(#grid)"/>
+  <rect x="0" y="0" width="8" height="300" rx="4" fill="url(#accent)"/>
+  <circle cx="545" cy="-20" r="210" fill="#49d8c2" fill-opacity="0.055"/>
+  <circle cx="1115" cy="306" r="250" fill="#5c8dff" fill-opacity="0.08"/>
+
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <rect x="54" y="38" width="226" height="30" rx="15" fill="#122f40" stroke="#4edcc6" stroke-opacity="0.45"/>
+    <circle cx="72" cy="53" r="4" fill="#55e4ca"/>
+    <text x="85" y="58" fill="#a9eee4" font-size="12" font-weight="700" letter-spacing="1.7">DGX SPARK · INSTALL GUIDE</text>
+
+    <text x="54" y="132" fill="#f2f8ff" font-size="54" font-weight="750" letter-spacing="-1.5">DGX Spark</text>
+    <text x="56" y="177" fill="#c5d7e7" font-size="27" font-weight="500">Установка локальных AI-моделей</text>
+    <text x="56" y="224" fill="#85a9bc" font-size="16" font-weight="600" letter-spacing="0.7">GB10  /  128 GB UNIFIED MEMORY  /  UBUNTU ARM64</text>
+
+    <rect x="750" y="38" width="394" height="224" rx="18" fill="#091827" fill-opacity="0.74" stroke="#b4d5e7" stroke-opacity="0.18"/>
+    <text x="780" y="72" fill="#86aabd" font-size="12" font-weight="700" letter-spacing="1.8">INSTALLATION PATH</text>
+
+    <rect x="780" y="91" width="334" height="62" rx="12" fill="#112c3c" stroke="#55e4ca" stroke-opacity="0.45"/>
+    <rect x="780" y="91" width="4" height="62" rx="2" fill="#55e4ca"/>
+    <text x="802" y="117" fill="#75e4d2" font-size="11" font-weight="700" letter-spacing="1.4">CODING API · FIRST</text>
+    <text x="802" y="139" fill="#f2f8ff" font-size="17" font-weight="650">Qwen3.8-27B · vLLM</text>
+
+    <path d="M947 155V174" stroke="#6ba6c1" stroke-width="2" stroke-dasharray="4 4"/>
+    <path d="m942 170 5 6 5-6" fill="none" stroke="#6ba6c1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="780" y="179" width="334" height="62" rx="12" fill="#182a3e" stroke="#75a5ff" stroke-opacity="0.4"/>
+    <rect x="780" y="179" width="4" height="62" rx="2" fill="#75a5ff"/>
+    <text x="802" y="205" fill="#99baff" font-size="11" font-weight="700" letter-spacing="1.4">OPTIONAL · IMAGE GENERATION</text>
+    <text x="802" y="227" fill="#f2f8ff" font-size="17" font-weight="650">ComfyUI + Z-Image-Turbo</text>
+  </g>
+</svg>
