@@ -1,5 +1,7 @@
 # DGX Spark 128 ГБ: установка локальных AI-моделей
 
+![DGX Spark 128 ГБ](https://img.shields.io/badge/DGX_Spark-128_GB-1f9d8b?style=for-the-badge&logo=nvidia&logoColor=white) ![Ubuntu 24.04 ARM64](https://img.shields.io/badge/OS-Ubuntu_24.04_ARM64-e95420?style=for-the-badge&logo=ubuntu&logoColor=white)
+
 ![Баннер руководства: DGX Spark GB10, 128 ГБ, Qwen API и дополнительная генерация изображений](./assets/dgx-spark-128gb-banner.svg)
 
 Практическое руководство для **NVIDIA DGX Spark GB10 с 128 ГБ unified memory** и Ubuntu 24.04 ARM64. Все команды и рецепты в этом руководстве относятся только к этой конфигурации. Ветки для других объёмов памяти здесь нет.
