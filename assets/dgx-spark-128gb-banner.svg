@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
-  <title id="title">DGX Spark 128 GB: установка локальных AI-моделей</title>
-  <desc id="description">Инженерное руководство для конфигурации DGX Spark 128 ГБ: Qwen API и дополнительный ComfyUI с Z-Image.</desc>
+  <title id="title">NVIDIA DGX Spark GB10: установка локальных AI-моделей</title>
+  <desc id="description">Инженерное руководство для NVIDIA DGX Spark GB10 с 128 ГБ unified memory: Qwen API и дополнительный ComfyUI с Z-Image.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#081522"/>
@@ -23,11 +23,11 @@
   <circle cx="1115" cy="306" r="250" fill="#5c8dff" fill-opacity="0.08"/>
 
   <g font-family="Inter, Segoe UI, Arial, sans-serif">
-    <rect x="54" y="38" width="226" height="30" rx="15" fill="#122f40" stroke="#4edcc6" stroke-opacity="0.45"/>
+    <rect x="54" y="38" width="300" height="30" rx="15" fill="#122f40" stroke="#4edcc6" stroke-opacity="0.45"/>
     <circle cx="72" cy="53" r="4" fill="#55e4ca"/>
     <text x="85" y="58" fill="#a9eee4" font-size="12" font-weight="700" letter-spacing="1.7">DGX SPARK · INSTALL GUIDE</text>
 
-    <text x="54" y="132" fill="#f2f8ff" font-size="54" font-weight="750" letter-spacing="-1.5">DGX Spark</text>
+    <text x="54" y="132" fill="#f2f8ff" font-size="48" font-weight="750" letter-spacing="-1.5">NVIDIA DGX Spark GB10</text>
     <text x="56" y="177" fill="#c5d7e7" font-size="27" font-weight="500">Установка локальных AI-моделей</text>
     <text x="56" y="224" fill="#85a9bc" font-size="16" font-weight="600" letter-spacing="0.7">GB10  /  128 GB UNIFIED MEMORY  /  UBUNTU ARM64</text>
 
